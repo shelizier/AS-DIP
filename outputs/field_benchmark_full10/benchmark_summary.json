@@ -1,0 +1,44 @@
+[
+  {
+    "experiment_name": "field_benchmark_full10",
+    "dataset_type": "field",
+    "method": "Standard DIP",
+    "method_id": "standard_dip",
+    "best_iteration": 10,
+    "elapsed_seconds": 306.67284893989563,
+    "snr": -14.51779776173818,
+    "snr_input": -0.8169071083418361,
+    "snr_gain": -13.700890653396344,
+    "psnr": 13.19880333472824,
+    "ssim": 0.018640298233290147,
+    "residual_energy": 0.13814668357372284
+  },
+  {
+    "experiment_name": "field_benchmark_full10",
+    "dataset_type": "field",
+    "method": "DRP-DIP",
+    "method_id": "drp_dip",
+    "best_iteration": 10,
+    "elapsed_seconds": 199.62805080413818,
+    "snr": -11.672674353306384,
+    "snr_input": -0.8169071083418361,
+    "snr_gain": -10.855767244964548,
+    "psnr": 16.043926743160036,
+    "ssim": 0.026360398867170894,
+    "residual_energy": 0.07409140467643738
+  },
+  {
+    "experiment_name": "field_benchmark_full10",
+    "dataset_type": "field",
+    "method": "AS-DIP",
+    "method_id": "as_dip",
+    "best_iteration": 10,
+    "elapsed_seconds": 207.93540287017822,
+    "snr": -5.304888992313462,
+    "snr_input": -0.8169071083418361,
+    "snr_gain": -4.487981883971625,
+    "psnr": 22.411712104152958,
+    "ssim": 0.009226750434224003,
+    "residual_energy": 0.02136762998998165
+  }
+]
