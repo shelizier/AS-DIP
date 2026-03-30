@@ -1,0 +1,9 @@
+experiments:
+  - experiment_name: benchmark_synthetic
+    dataset_type: synthetic
+    iterations: 300
+    samples: 256
+    traces: 128
+    event_count: 6
+    benchmark: true
+    save_inputs: true

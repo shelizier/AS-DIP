@@ -1,0 +1,8 @@
+experiments:
+  - experiment_name: benchmark_field
+    dataset_type: field
+    noisy_path: data/field/noisy.npy
+    clean_path: data/field/clean.npy
+    iterations: 300
+    benchmark: true
+    save_inputs: true
