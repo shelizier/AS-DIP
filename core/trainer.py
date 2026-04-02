@@ -33,8 +33,8 @@ class TrainerConfig:
     output_channels: int = 1
     activation: str = "mish"
     norm: str = "batch"
-    learning_rate: float = 1e-2
-    latent_learning_rate: float = 1e-2
+    learning_rate: float = 1e-3
+    seed_learning_rate: float = 1e-2
     adapter_learning_rate: float = 1e-3
     iterations: int = 1500
     tv_weight: float = 0.05
@@ -121,12 +121,12 @@ class ASDIPTrainer:
         if self.config.mode == "standard_dip":
             return torch.optim.Adam(model.parameters(), lr=self.config.learning_rate)
 
-        parameter_groups = [{"params": [latent], "lr": self.config.latent_learning_rate}]
+        parameter_groups = [{"params": [latent], "lr": self.config.seed_learning_rate}]
         if isinstance(model, DRPWrapper):
             trainable = list(model.trainable_parameters())
             if trainable:
                 parameter_groups.append({"params": trainable, "lr": self.config.adapter_learning_rate})
-        return torch.optim.Adam(parameter_groups, lr=self.config.latent_learning_rate)
+        return torch.optim.Adam(parameter_groups, lr=self.config.seed_learning_rate)
 
     def run(
         self,

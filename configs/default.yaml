@@ -5,9 +5,9 @@ mode: as_dip
 backbone: unet
 activation: mish
 norm: batch
-iterations: 600
+iterations: 1500
 learning_rate: 0.001
-latent_learning_rate: 0.05
+seed_learning_rate: 0.01
 adapter_learning_rate: 0.001
 tv_weight: 0.05
 tv_mode: l1

@@ -36,7 +36,7 @@ def build_trainer_config(args: argparse.Namespace, mode: str) -> TrainerConfig:
         activation=args.activation,
         norm=args.norm,
         learning_rate=args.learning_rate,
-        latent_learning_rate=args.latent_learning_rate,
+        seed_learning_rate=args.seed_learning_rate,
         adapter_learning_rate=args.adapter_learning_rate,
         iterations=args.iterations,
         tv_weight=mode_tv_weight,
