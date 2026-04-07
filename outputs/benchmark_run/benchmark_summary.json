@@ -1,0 +1,38 @@
+[
+  {
+    "experiment_name": "benchmark_run",
+    "dataset_type": "synthetic",
+    "method": "Standard DIP",
+    "method_id": "standard_dip",
+    "best_iteration": 331,
+    "elapsed_seconds": 138.41706323623657,
+    "snr": 7.792974416496959,
+    "snr_input": 5.226967462011347,
+    "snr_gain": 2.566006954485612,
+    "residual_energy": 0.002300499938428402
+  },
+  {
+    "experiment_name": "benchmark_run",
+    "dataset_type": "synthetic",
+    "method": "DRP-DIP",
+    "method_id": "drp_dip",
+    "best_iteration": 2194,
+    "elapsed_seconds": 89.16956114768982,
+    "snr": 9.379605918576605,
+    "snr_input": 5.226967462011347,
+    "snr_gain": 4.152638456565258,
+    "residual_energy": 0.0019148994470015168
+  },
+  {
+    "experiment_name": "benchmark_run",
+    "dataset_type": "synthetic",
+    "method": "AS-DIP",
+    "method_id": "as_dip",
+    "best_iteration": 1808,
+    "elapsed_seconds": 93.43086385726929,
+    "snr": 9.514889550057509,
+    "snr_input": 5.226967462011347,
+    "snr_gain": 4.287922088046162,
+    "residual_energy": 0.0026046084240078926
+  }
+]
