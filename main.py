@@ -28,7 +28,6 @@ def setup_logging() -> None:
 
 
 def build_trainer_config(args: argparse.Namespace, mode: str) -> TrainerConfig:
-    mode_tv_weight = 0.0 if mode == "drp_dip" else args.tv_weight
     return TrainerConfig(
         mode=mode,
         backbone=args.backbone,
@@ -36,10 +35,10 @@ def build_trainer_config(args: argparse.Namespace, mode: str) -> TrainerConfig:
         activation=args.activation,
         norm=args.norm,
         learning_rate=args.learning_rate,
-        latent_learning_rate=args.latent_learning_rate,
+        seed_learning_rate=args.seed_learning_rate,
         adapter_learning_rate=args.adapter_learning_rate,
         iterations=args.iterations,
-        tv_weight=mode_tv_weight,
+        tv_weight=args.tv_weight,
         tv_mode=args.tv_mode,
         log_interval=args.log_interval,
         pad_border=args.pad_border,

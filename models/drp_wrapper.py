@@ -19,6 +19,8 @@ class DRPWrapper(nn.Module):
         out_channels: int = 1,
     ) -> None:
         super().__init__()
+        self.train_norm_layers = train_norm_layers
+        self.train_output_adapter = train_output_adapter
         self.backbone = backbone
         self.output_adapter = nn.Conv2d(out_channels, out_channels, kernel_size=1, bias=True)
         if not train_output_adapter:
@@ -57,6 +59,69 @@ class DRPWrapper(nn.Module):
         parameters: List[nn.Parameter] = list(self.trainable_backbone_parameters())
         parameters.extend(parameter for parameter in self.output_adapter.parameters() if parameter.requires_grad)
         return parameters
+
+    def backbone_stage_names(self) -> List[str]:
+        """Return ordered backbone stage names for progressive unfreezing."""
+        names: List[str] = []
+        for name, module in self.backbone.named_children():
+            if isinstance(module, nn.ModuleList):
+                for index, _ in enumerate(module):
+                    names.append(f"{name}.{index}")
+            else:
+                names.append(name)
+        return names
+
+    def _resolve_module(self, module_path: str) -> nn.Module:
+        module: nn.Module = self.backbone
+        for token in module_path.split("."):
+            if token.isdigit():
+                module = module[int(token)]  # type: ignore[index]
+            else:
+                module = getattr(module, token)
+        return module
+
+    def _set_module_requires_grad(self, module: nn.Module, requires_grad: bool) -> None:
+        for parameter in module.parameters():
+            parameter.requires_grad = requires_grad
+
+    def freeze_all(self) -> None:
+        """Freeze the entire wrapper so training can be re-enabled stage by stage."""
+        self._set_module_requires_grad(self.backbone, False)
+        self._set_module_requires_grad(self.output_adapter, False)
+
+    def unfreeze_layer(self, layer_type: str) -> None:
+        """Unfreeze a logical layer group or specific backbone stage."""
+        if layer_type == "adapter":
+            if self.train_output_adapter:
+                self._set_module_requires_grad(self.output_adapter, True)
+            return
+
+        if layer_type == "norm":
+            if not self.train_norm_layers:
+                return
+            for module in self.backbone.modules():
+                if isinstance(module, (nn.BatchNorm2d, nn.InstanceNorm2d)) and getattr(module, "affine", False):
+                    if module.weight is not None:
+                        module.weight.requires_grad = True
+                    if module.bias is not None:
+                        module.bias.requires_grad = True
+            return
+
+        if layer_type == "backbone":
+            self._set_module_requires_grad(self.backbone, True)
+            return
+
+        if layer_type.startswith("backbone:"):
+            module_path = layer_type.split(":", maxsplit=1)[1]
+            self._set_module_requires_grad(self._resolve_module(module_path), True)
+            return
+
+        if layer_type == "all":
+            self._set_module_requires_grad(self.backbone, True)
+            self.unfreeze_layer("adapter")
+            return
+
+        raise ValueError(f"Unsupported layer_type: {layer_type}")
 
     def forward(self, inputs: torch.Tensor) -> torch.Tensor:
         outputs = self.backbone(inputs)
