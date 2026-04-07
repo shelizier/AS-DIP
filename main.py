@@ -28,21 +28,66 @@ def setup_logging() -> None:
 
 
 def build_trainer_config(args: argparse.Namespace, mode: str) -> TrainerConfig:
+    use_paper_style_drp = mode in {"drp_dip", "as_dip"}
+    use_asdip_enhancement = mode == "as_dip"
+    # Fixed per-method schedule (CLI/YAML learning-rate and tv-weight are ignored for these modes).
+    # AS-DIP: same LR scale as DRP; reconstruction term matches DRP (pure MSE) so SNR is not
+    # pulled toward the noisy observation. TV slightly stronger than DRP; phased reg-noise
+    # milder than 2× base so early phases do not dominate with jitter.
+    if mode == "standard_dip":
+        learning_rate = 1e-3
+        latent_learning_rate = args.standard_latent_learning_rate
+        tv_weight = 0.0
+        reg_noise_std = 0.03
+    elif mode == "drp_dip":
+        learning_rate = 0.1
+        latent_learning_rate = 0.1
+        tv_weight = 0.05
+        reg_noise_std = 0.03
+    elif mode == "as_dip":
+        learning_rate = 0.1
+        latent_learning_rate = 0.1
+        tv_weight = 0.065
+        reg_noise_std = 0.03
+        # Phased noise: modest bump in phase1–2 vs flat 0.03; phase3 slightly below base for stability.
+    else:
+        learning_rate = args.learning_rate
+        latent_learning_rate = args.latent_learning_rate
+        tv_weight = args.tv_weight
+        reg_noise_std = 0.0
+
     return TrainerConfig(
         mode=mode,
         backbone=args.backbone,
         input_channels=args.input_channels,
         activation=args.activation,
-        norm=args.norm,
-        learning_rate=args.learning_rate,
-        seed_learning_rate=args.seed_learning_rate,
+        norm="batch" if use_paper_style_drp else args.norm,
+        learning_rate=learning_rate,
+        latent_learning_rate=latent_learning_rate,
         adapter_learning_rate=args.adapter_learning_rate,
         iterations=args.iterations,
-        tv_weight=args.tv_weight,
+        tv_weight=tv_weight,
         tv_mode=args.tv_mode,
         log_interval=args.log_interval,
         pad_border=args.pad_border,
-        reg_noise_std=0.03 if mode == "standard_dip" else 0.0,
+        reg_noise_std=reg_noise_std,
+        reg_noise_std_phase1=(0.035 if use_asdip_enhancement else None),
+        reg_noise_std_phase2=(0.03 if use_asdip_enhancement else None),
+        reg_noise_std_phase3=(0.022 if use_asdip_enhancement else None),
+        train_output_adapter=(mode == "as_dip"),
+        phased_optimization=(mode == "as_dip"),
+        backbone_learning_rate=min(learning_rate, args.adapter_learning_rate) * 0.5,
+        use_structured_latent=use_asdip_enhancement,
+        latent_coord_channels=2,
+        mse_weight=1.0,
+        l1_weight=0.0,
+        tv_weight_t=1.25 if use_asdip_enhancement else 1.0,
+        tv_weight_x=0.75 if use_asdip_enhancement else 1.0,
+        gradient_weight=0.0,
+        phase3_latent_lr_scale=0.5 if use_asdip_enhancement else 0.1,
+        phase1_fraction=0.15 if use_asdip_enhancement else 0.2,
+        phase2_fraction=0.25 if use_asdip_enhancement else 0.3,
+        exp_smoothing=0.96 if use_asdip_enhancement else 0.99,
     )
 
 
@@ -72,16 +117,15 @@ def summarize_result(name: str, result: Any) -> str:
         return f"{display_name}: time={result.elapsed_seconds:.2f}s, best_iter={result.best_iteration}"
     summary = (
         f"{display_name}: time={result.elapsed_seconds:.2f}s, best_iter={result.best_iteration}, "
+        f"SNR={metrics.get('snr', float('nan')):.2f} dB, "
         f"SNR gain={metrics.get('snr_gain', float('nan')):.2f} dB"
     )
-    if "psnr" in metrics:
-        summary += f", PSNR={metrics['psnr']:.2f} dB"
     return summary
 
 
 def run_experiment(args: argparse.Namespace) -> None:
     seed_everything(args.seed)
-    device = select_device(prefer_cuda=True)
+    device = select_device(prefer_accelerator=True)
     logging.info("Using device: %s", device)
 
     noisy, clean, metadata = prepare_dataset(args)

@@ -40,8 +40,6 @@ def export_benchmark_summary(
                 "snr": _safe_metric(metrics, "snr"),
                 "snr_input": _safe_metric(metrics, "snr_input"),
                 "snr_gain": _safe_metric(metrics, "snr_gain"),
-                "psnr": _safe_metric(metrics, "psnr"),
-                "ssim": _safe_metric(metrics, "ssim"),
                 "residual_energy": _safe_metric(metrics, "residual_energy"),
             }
         )
@@ -119,8 +117,6 @@ def collect_experiment_rows(outputs_root: str | Path) -> List[Dict[str, Any]]:
                 "snr": metrics.get("snr"),
                 "snr_input": metrics.get("snr_input"),
                 "snr_gain": metrics.get("snr_gain"),
-                "psnr": metrics.get("psnr"),
-                "ssim": metrics.get("ssim"),
                 "residual_energy": metrics.get("residual_energy"),
             }
         )
