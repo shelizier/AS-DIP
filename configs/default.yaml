@@ -1,15 +1,14 @@
 experiment_name: default_synthetic_run
 dataset_type: synthetic
+seed: 121
 benchmark: false
 mode: as_dip
 backbone: unet
 activation: mish
 norm: batch
-iterations: 1500
-learning_rate: 0.001
-seed_learning_rate: 0.01
+iterations: 2200
+# Backbone / latent LR and TV weights for standard_dip, drp_dip, and as_dip are fixed in main.py (as_dip matches DRP-DIP LR scale; see build_trainer_config).
 adapter_learning_rate: 0.001
-tv_weight: 0.05
 tv_mode: l1
 input_channels: 32
 samples: 256

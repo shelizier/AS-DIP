@@ -35,16 +35,37 @@ def build_parser(defaults: Dict[str, Any] | None = None) -> argparse.ArgumentPar
     parser.add_argument("--backbone", choices=["unet", "lightweight"], default="unet")
     parser.add_argument("--activation", choices=["mish", "leaky_relu"], default="mish")
     parser.add_argument("--norm", choices=["batch", "instance"], default="batch")
-    parser.add_argument("--iterations", type=int, default=1500)
-    parser.add_argument("--learning-rate", type=float, default=1e-3)
-    parser.add_argument("--seed-learning-rate", type=float, default=1e-2)
+    parser.add_argument("--iterations", type=int, default=2200)
+    parser.add_argument(
+        "--learning-rate",
+        type=float,
+        default=1e-2,
+        help="Fallback LR only; standard_dip / drp_dip / as_dip use fixed schedules in main.py.",
+    )
+    parser.add_argument(
+        "--latent-learning-rate",
+        type=float,
+        default=1e-2,
+        help="Fallback latent LR; main modes use fixed values (see main.build_trainer_config).",
+    )
+    parser.add_argument(
+        "--standard-latent-learning-rate",
+        type=float,
+        default=5e-2,
+        help="Latent LR for standard_dip only (DRP/AS-DIP use --latent-learning-rate).",
+    )
     parser.add_argument("--adapter-learning-rate", type=float, default=1e-3)
-    parser.add_argument("--tv-weight", type=float, default=0.05)
+    parser.add_argument(
+        "--tv-weight",
+        type=float,
+        default=0.05,
+        help="Fallback TV weight; standard_dip / drp_dip / as_dip use fixed values in main.py.",
+    )
     parser.add_argument("--tv-mode", choices=["l1", "l2"], default="l1")
     parser.add_argument("--log-interval", type=int, default=100)
     parser.add_argument("--input-channels", type=int, default=32)
     parser.add_argument("--pad-border", type=int, default=0)
-    parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--seed", type=int, default=121)
     parser.add_argument("--output-dir", type=str, default="outputs")
     parser.add_argument("--experiment-name", type=str, default="as_dip_run")
     parser.add_argument("--noisy-path", type=str, default="data/field/noisy.npy")

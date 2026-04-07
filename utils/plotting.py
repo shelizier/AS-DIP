@@ -62,16 +62,16 @@ def plot_seismic_panels(
 
 
 def plot_benchmark_curves(results: Dict[str, Dict[str, list[float]]], save_path: str | Path) -> None:
-    """Plot PSNR and loss benchmark curves for multiple methods."""
+    """Plot SNR and loss benchmark curves for multiple methods."""
     set_publication_style()
     figure, axes = plt.subplots(1, 2, figsize=(14, 5), constrained_layout=True)
     for method, history in results.items():
         label = method_display_name(method)
-        if history.get("elapsed_seconds") and history.get("psnr"):
-            axes[0].plot(history["elapsed_seconds"][: len(history["psnr"])], history["psnr"], label=label, linewidth=1.8)
+        if history.get("elapsed_seconds") and history.get("snr"):
+            axes[0].plot(history["elapsed_seconds"][: len(history["snr"])], history["snr"], label=label, linewidth=1.8)
         axes[1].plot(history["iterations"], history["total_loss"], label=label, linewidth=1.6)
     axes[0].set_xlabel("Time (s)")
-    axes[0].set_ylabel("PSNR (dB)")
+    axes[0].set_ylabel("SNR (dB)")
     axes[0].set_title("Convergence Speed")
     axes[0].grid(alpha=0.3)
     axes[0].legend()

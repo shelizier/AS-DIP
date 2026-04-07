@@ -36,22 +36,22 @@ AS-DIP/
 
 ## Core Idea
 
-AS-DIP takes a noisy seismic section and reconstructs it through an untrained neural network. Instead of learning from a dataset of clean/noisy pairs, it relies on network structure, a low-dimensional input seed, and seismic-specific regularization.
+AS-DIP takes a noisy seismic section and reconstructs it through an untrained neural network. Instead of learning from a dataset of clean/noisy pairs, it relies on network structure, a low-dimensional latent seed, and seismic-specific regularization.
 
 The repository currently supports three method variants:
 
 1. `standard_dip`
    Optimizes the generator network parameters directly and serves as the classical DIP baseline.
 2. `drp_dip`
-   Keeps the original DRP-DIP idea as a comparison baseline by freezing most randomly initialized network weights and optimizing only the input seed and lightweight trainable layers.
+   Follows the original DRP-DIP paper more closely by freezing the randomly initialized backbone, optimizing the input seed and BatchNorm affine parameters, and enabling TV regularization.
 3. `as_dip`
-   Represents the proposed AS-DIP method. It keeps the DRP-style accelerated optimization strategy and adds TV regularization as a seismic-oriented enhancement.
+   Builds on the DRP-DIP baseline with phased optimization: warm up the latent seed first, then train the adapter and normalization layers, and finally progressively unfreeze the backbone with a lower latent learning rate and residual-risk monitoring.
 
 In short:
 
 - `standard_dip` = classical DIP baseline
-- `drp_dip` = original DRP-DIP comparison method
-- `as_dip` = proposed AS-DIP method
+- `drp_dip` = original paper-style DRP-DIP
+- `as_dip` = phased DRP-style refinement with progressive backbone unfreezing
 
 ## Data
 

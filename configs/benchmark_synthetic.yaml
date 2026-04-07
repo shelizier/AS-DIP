@@ -1,7 +1,8 @@
 experiments:
   - experiment_name: benchmark_synthetic
     dataset_type: synthetic
-    iterations: 300
+    seed: 121
+    iterations: 2200
     samples: 256
     traces: 128
     event_count: 6
