@@ -1,10 +1,8 @@
-"""Unified entry point for AS-DIP seismic denoising experiments."""
-
 from __future__ import annotations
-
+import os
+os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 import argparse
 import logging
-import os
 from pathlib import Path
 from typing import Any, Dict
 
@@ -28,33 +26,52 @@ def setup_logging() -> None:
 
 
 def build_trainer_config(args: argparse.Namespace, mode: str) -> TrainerConfig:
-    use_paper_style_drp = mode in {"drp_dip", "as_dip"}
+    # 只有原始 DRP 强制用 batch norm，让 AS-DIP 使用更高级的 norm (默认 instance)
+    use_paper_style_drp = mode == "drp_dip"
     use_asdip_enhancement = mode == "as_dip"
-    # Fixed per-method schedule (CLI/YAML learning-rate and tv-weight are ignored for these modes).
-    # AS-DIP: same LR scale as DRP; reconstruction term matches DRP (pure MSE) so SNR is not
-    # pulled toward the noisy observation. TV slightly stronger than DRP; phased reg-noise
-    # milder than 2× base so early phases do not dominate with jitter.
+
+    # 默认参数打底
+    exp_smoothing = 0.99
+    phase1_fraction = 0.2
+    phase2_fraction = 0.3
+    tv_weight_t = 1.0
+    tv_weight_x = 1.0
+    # 默认的相似度阈值
+    residual_sim_threshold = 0.90
+
     if mode == "standard_dip":
         learning_rate = 1e-3
         latent_learning_rate = args.standard_latent_learning_rate
-        tv_weight = 0.0
+        # 【公平起见】：给 Standard DIP 也加上一点 TV 参与神仙打架！
+        tv_weight = 0.02
         reg_noise_std = 0.03
     elif mode == "drp_dip":
         learning_rate = 0.1
         latent_learning_rate = 0.1
-        tv_weight = 0.05
+        tv_weight = 0.25  # DRP 必须高 TV
         reg_noise_std = 0.03
     elif mode == "as_dip":
         learning_rate = 0.1
         latent_learning_rate = 0.1
-        tv_weight = 0.065
+        # 【关键】：降低 TV 到 0.1，把舞台留给解冻后的 CNN
+        tv_weight = 0.1
         reg_noise_std = 0.03
-        # Phased noise: modest bump in phase1–2 vs flat 0.03; phase3 slightly below base for stability.
+
+        use_asdip_enhancement = True
+        exp_smoothing = 0.90
+        phase1_fraction = 0.15
+        phase2_fraction = 0.15
+        tv_weight_t = 1.2
+        tv_weight_x = 0.8
+        # 【解除封印】：防止过早触发 Signal Leakage 锁死学习率！
+        residual_sim_threshold = 0.995
     else:
         learning_rate = args.learning_rate
         latent_learning_rate = args.latent_learning_rate
         tv_weight = args.tv_weight
         reg_noise_std = 0.0
+
+    current_iterations = args.iterations if mode == "standard_dip" else args.iterations * 2
 
     return TrainerConfig(
         mode=mode,
@@ -65,7 +82,7 @@ def build_trainer_config(args: argparse.Namespace, mode: str) -> TrainerConfig:
         learning_rate=learning_rate,
         latent_learning_rate=latent_learning_rate,
         adapter_learning_rate=args.adapter_learning_rate,
-        iterations=args.iterations,
+        iterations=current_iterations,
         tv_weight=tv_weight,
         tv_mode=args.tv_mode,
         log_interval=args.log_interval,
@@ -81,15 +98,17 @@ def build_trainer_config(args: argparse.Namespace, mode: str) -> TrainerConfig:
         latent_coord_channels=2,
         mse_weight=1.0,
         l1_weight=0.0,
-        tv_weight_t=1.25 if use_asdip_enhancement else 1.0,
-        tv_weight_x=0.75 if use_asdip_enhancement else 1.0,
         gradient_weight=0.0,
         phase3_latent_lr_scale=0.5 if use_asdip_enhancement else 0.1,
-        phase1_fraction=0.15 if use_asdip_enhancement else 0.2,
-        phase2_fraction=0.25 if use_asdip_enhancement else 0.3,
-        exp_smoothing=0.96 if use_asdip_enhancement else 0.99,
-    )
 
+        tv_weight_t=tv_weight_t,
+        tv_weight_x=tv_weight_x,
+        phase1_fraction=phase1_fraction,
+        phase2_fraction=phase2_fraction,
+        exp_smoothing=exp_smoothing,
+        # 传入解除封印的阈值
+        residual_similarity_threshold=residual_sim_threshold,
+    )
 
 def prepare_dataset(args: argparse.Namespace) -> tuple[np.ndarray, np.ndarray | None, Dict[str, np.ndarray]]:
     if args.dataset_type == "synthetic":
@@ -125,7 +144,7 @@ def summarize_result(name: str, result: Any) -> str:
 
 def run_experiment(args: argparse.Namespace) -> None:
     seed_everything(args.seed)
-    device = select_device(prefer_accelerator=True)
+    device = select_device()
     logging.info("Using device: %s", device)
 
     noisy, clean, metadata = prepare_dataset(args)

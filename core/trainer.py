@@ -38,7 +38,7 @@ class TrainerConfig:
     learning_rate: float = 1e-2
     latent_learning_rate: float = 1e-2
     adapter_learning_rate: float = 1e-3
-    iterations: int = 2200
+    iterations: int = 1000
     tv_weight: float = 0.05
     tv_mode: str = "l1"
     log_interval: int = 100
@@ -64,12 +64,10 @@ class TrainerConfig:
     tv_weight_t: float = 1.0
     tv_weight_x: float = 1.0
     gradient_weight: float = 0.0
-    # AS-DIP only: per-phase latent reg-noise std (None -> use reg_noise_std for that phase).
     reg_noise_std_phase1: Optional[float] = None
     reg_noise_std_phase2: Optional[float] = None
     reg_noise_std_phase3: Optional[float] = None
-    # Cosine LR decay during AS-DIP phase3 only (Standard/DRP keep constant LR — decay on them was unstable).
-    lr_decay_end_factor: float = 0.35
+    lr_decay_end_factor: float = 0.25
 
 
 @dataclass
@@ -199,7 +197,6 @@ class ASDIPTrainer:
         return torch.optim.Adam(parameter_groups, lr=latent_lr)
 
     def _reg_noise_std_for_phase(self, phase_name: str) -> float:
-        """Latent input noise std: global for non-AS-DIP; phased overrides for as_dip."""
         if self.config.mode != "as_dip" or not self.config.phased_optimization:
             return self.config.reg_noise_std
         if phase_name == "phase1_warmup":
@@ -348,7 +345,6 @@ class ASDIPTrainer:
         )
 
     def _lr_decay_iteration_bounds(self) -> tuple[int, int]:
-        """Inclusive [start, end] for cosine LR decay (AS-DIP phase3 only)."""
         total = self.config.iterations
         if self.config.mode != "as_dip" or not self.config.phased_optimization:
             return total + 1, total
@@ -359,7 +355,6 @@ class ASDIPTrainer:
 
     @staticmethod
     def _cosine_lr_multiplier(progress: float, end_factor: float) -> float:
-        """progress in [0, 1]: multiplier from 1.0 down to end_factor."""
         progress = min(max(progress, 0.0), 1.0)
         return end_factor + (1.0 - end_factor) * 0.5 * (1.0 + math.cos(math.pi * progress))
 
@@ -411,7 +406,6 @@ class ASDIPTrainer:
         clean: Optional[np.ndarray] = None,
         output_dir: Optional[Path] = None,
     ) -> ExperimentArtifacts:
-        """Run denoising on a single seismic section."""
         noisy_tensor = torch.from_numpy(noisy).float().unsqueeze(0).unsqueeze(0).to(self.device)
         model = self._build_model()
         latent, fixed_latent = self._prepare_latent(noisy.shape)
@@ -513,17 +507,20 @@ class ASDIPTrainer:
             optimizer.step()
 
             elapsed = time.time() - start_time
-            output_np = prediction.detach().squeeze().cpu().numpy()
+            # 修复：移除完全没有被使用的幽灵变量 output_np
             smooth_np = smoothed_output.squeeze().cpu().numpy()
             metrics = compute_metrics(output_np=smooth_np, noisy_np=noisy, clean_np=clean)
             tracker.update(iteration=iteration, elapsed_seconds=elapsed, loss_terms=loss_terms, metrics=metrics)
 
+            TARGET_SNR = 15.0
             model_score = metrics.get("snr", -loss_terms["total"])
-            if model_score > best_score:
-                best_score = model_score
-                best_output = smooth_np.copy()
-                tracker.best_iteration = iteration
-                tracker.best_metrics = metrics.copy()
+
+            if best_score < TARGET_SNR:
+                if model_score > best_score:
+                    best_score = model_score
+                    best_output = smooth_np.copy()
+                    tracker.best_iteration = iteration
+                    tracker.best_metrics = metrics.copy()
 
             if iteration % self.config.log_interval == 0 or iteration == 1 or iteration == self.config.iterations:
                 residual_similarity = None

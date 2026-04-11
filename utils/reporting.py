@@ -13,6 +13,7 @@ import numpy as np
 from .naming import method_display_name
 from .plotting import set_publication_style
 
+
 def _safe_metric(metrics: Dict[str, Any], key: str) -> Optional[float]:
     value = metrics.get(key)
     return None if value is None else float(value)
@@ -64,22 +65,32 @@ def plot_method_overview(
     set_publication_style()
     method_names = list(results.keys())
     ncols = 2 + len(method_names)
+
     figure, axes = plt.subplots(2, ncols, figsize=(4.2 * ncols, 8.0), constrained_layout=True)
 
-    def plot_panel(ax: plt.Axes, data: np.ndarray, title: str) -> None:
-        vmax = float(np.max(np.abs(data))) if np.max(np.abs(data)) > 0 else 1.0
-        image = ax.imshow(data, cmap="seismic", aspect="auto", vmin=-vmax, vmax=vmax)
+    reference = clean if clean is not None else noisy
+    all_data = [np.abs(reference), np.abs(noisy)] + [np.abs(res.denoised) for res in results.values()]
+    global_vmax = np.percentile(np.concatenate([d.flatten() for d in all_data]), 99.5)
+    if global_vmax == 0:
+        global_vmax = 1.0
+
+    def plot_panel(ax: plt.Axes, data: np.ndarray, title: str, is_residual: bool = False) -> None:
+        vmax = float(np.percentile(np.abs(data), 99.5)) if is_residual else global_vmax
+        if vmax == 0:
+            vmax = 1.0
+
+        # 【抗锯齿神器】：使用 lanczos 顶级平滑算法
+        image = ax.imshow(data, cmap="seismic", aspect="auto", vmin=-vmax, vmax=vmax, interpolation="lanczos")
         ax.set_title(title)
         ax.set_xlabel("Trace")
         ax.set_ylabel("Time")
         colorbar = plt.colorbar(image, ax=ax, fraction=0.046, pad=0.04)
         colorbar.set_label("Amplitude")
 
-    reference = clean if clean is not None else noisy
     plot_panel(axes[0, 0], reference, "Original Data")
-    plot_panel(axes[1, 0], np.zeros_like(reference), "Reference Residual")
+    plot_panel(axes[1, 0], np.zeros_like(reference), "Reference Residual", is_residual=True)
     plot_panel(axes[0, 1], noisy, "Noisy Data")
-    plot_panel(axes[1, 1], noisy - reference, "Input Residual")
+    plot_panel(axes[1, 1], noisy - reference, "Input Residual", is_residual=True)
 
     for column, method in enumerate(method_names, start=2):
         result = results[method]
@@ -87,8 +98,9 @@ def plot_method_overview(
         if result.best_metrics and "snr_gain" in result.best_metrics:
             method_title += f"\nSNR gain {result.best_metrics['snr_gain']:.2f} dB"
         plot_panel(axes[0, column], result.denoised, method_title)
+
         residual = (clean - result.denoised) if clean is not None else result.residual
-        plot_panel(axes[1, column], residual, f"{method_title}\nResidual")
+        plot_panel(axes[1, column], residual, f"{method_title}\nResidual", is_residual=True)
 
     save_path = Path(save_path)
     save_path.parent.mkdir(parents=True, exist_ok=True)

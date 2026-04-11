@@ -1,9 +1,8 @@
-experiments:
-  - experiment_name: benchmark_field
-    dataset_type: field
-    seed: 121
-    noisy_path: data/field/noisy.npy
-    clean_path: data/field/clean.npy
-    iterations: 2200
-    benchmark: true
-    save_inputs: true
+experiment_name: benchmark_field
+dataset_type: field
+seed: 44
+noisy_path: data/field/syn_noisy.npy
+clean_path: data/field/syn_clean.npy
+iterations: 500
+benchmark: default
+save_inputs: true
