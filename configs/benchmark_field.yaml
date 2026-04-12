@@ -1,8 +1,19 @@
 experiment_name: benchmark_field
 dataset_type: field
-seed: 44
+seed: 22
 noisy_path: data/field/syn_noisy.npy
 clean_path: data/field/syn_clean.npy
-iterations: 500
-benchmark: default
+iterations: 400
+benchmark: false
 save_inputs: true
+norm: instance            # 关键：改为 instance
+pad_border: 8            # 关键：启用反射填充防止边缘扩散条纹
+use_structured_latent: true # 关键：引入坐标感知(如果你在loader暴漏了的话)
+
+# 损失函数权重重分配
+tv_weight: 0.2
+tv_weight_t: 0.1         # 关键：大幅降低竖直方向平滑，防止拉出竖条
+tv_weight_x: 1         # 关键：加强水平约束，保护同相轴连贯性
+ssim_weight: 0.2
+ortho_weight: 0.25
+max_allowed_snr: 13

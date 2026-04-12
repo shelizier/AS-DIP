@@ -57,37 +57,36 @@ class DRPWrapper(nn.Module):
         self._set_module_trainable(self.output_adapter, enabled)
 
     def backbone_progression_groups(self) -> List[List[nn.Module]]:
-        if all(hasattr(self.backbone, attr) for attr in ("input_block", "down_blocks", "bottom", "up_blocks", "output_block")):
+        """将骨干网络切分为更细粒度的解冻阶段。"""
+        if all(hasattr(self.backbone, attr) for attr in
+               ("input_block", "down_blocks", "bottom", "up_blocks", "output_block")):
             groups: List[List[nn.Module]] = [[self.backbone.output_block]]
+
+            # 1. 逐层解冻解码器 (Up Blocks)
             up_blocks = list(self.backbone.up_blocks)
-            if up_blocks:
-                groups.append([up_blocks[-1]])
-            if len(up_blocks) > 1:
-                groups.append([up_blocks[-2]])
-            remaining: List[nn.Module] = []
-            if len(up_blocks) > 2:
-                remaining.extend(up_blocks[:-2])
-            remaining.append(self.backbone.bottom)
-            remaining.extend(reversed(list(self.backbone.down_blocks)))
-            remaining.append(self.backbone.input_block)
-            groups.append(remaining)
+            for up_block in reversed(up_blocks):
+                groups.append([up_block])
+
+            # 2. 独立解冻瓶颈层 (Bottom)
+            groups.append([self.backbone.bottom])
+
+            # 3. 逐层解冻编码器 (Down Blocks)
+            for down_block in reversed(list(self.backbone.down_blocks)):
+                groups.append([down_block])
+
+            # 4. 最后解冻输入层 (Input Block)
+            groups.append([self.backbone.input_block])
+
             return [group for group in groups if group]
 
+        # 针对 LightweightGenerator 等其他结构的备用逻辑
         if hasattr(self.backbone, "network") and isinstance(self.backbone.network, nn.Sequential):
             modules = list(self.backbone.network.children())
             if not modules:
                 return []
-            groups = [[modules[-1]]]
-            if len(modules) > 1:
-                groups.append(modules[max(len(modules) - 4, 0):-1])
-            if len(modules) > 4:
-                groups.append(modules[max(len(modules) - 7, 0):max(len(modules) - 4, 0)])
-            if len(modules) > 7:
-                groups.append(modules[:max(len(modules) - 7, 0)])
-            return [group for group in groups if group]
+            return [[module] for module in reversed(modules)]  # 直接逐个模块解冻
 
         return [[self.backbone]]
-
     def configure_trainable_state(
         self,
         *,

@@ -61,6 +61,17 @@ def build_parser(defaults: Dict[str, Any] | None = None) -> argparse.ArgumentPar
         default=0.05,
         help="Fallback TV weight; standard_dip / drp_dip / as_dip use fixed values in main.py.",
     )
+    parser.add_argument("--mse-weight", type=float, default=1.0)
+    parser.add_argument("--l1-weight", type=float, default=0.0)
+
+    # ======== 新增命令行参数 ========
+    parser.add_argument("--ssim-weight", type=float, default=0.0, help="Weight for structural similarity loss.")
+    parser.add_argument("--ortho-weight", type=float, default=0.0,
+                        help="Weight for local orthogonality (signal leakage) loss.")
+    parser.add_argument("--ortho-window", type=int, default=9, help="Window size for computing local orthogonality.")
+
+    parser.set_defaults(**(defaults or {}))
+
     parser.add_argument("--tv-mode", choices=["l1", "l2"], default="l1")
     parser.add_argument("--log-interval", type=int, default=100)
     parser.add_argument("--input-channels", type=int, default=32)
@@ -78,6 +89,10 @@ def build_parser(defaults: Dict[str, Any] | None = None) -> argparse.ArgumentPar
     parser.add_argument("--coherent-noise-amplitude", type=float, default=0.15)
     parser.add_argument("--coherent-slope", type=float, default=0.35)
     parser.add_argument("--save-inputs", action="store_true", help="Save noisy and clean input arrays in the run folder.")
+    parser.set_defaults(**(defaults or {}))
+    parser.add_argument("--max-allowed-snr", type=float, default=15.0,
+                        help="Maximum allowed SNR before stopping best iteration updates to prevent over-smoothing.")
+
     parser.set_defaults(**(defaults or {}))
     return parser
 

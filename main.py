@@ -34,10 +34,10 @@ def build_trainer_config(args: argparse.Namespace, mode: str) -> TrainerConfig:
     exp_smoothing = 0.99
     phase1_fraction = 0.2
     phase2_fraction = 0.3
-    tv_weight_t = 1.0
+    tv_weight_t = 0.1
     tv_weight_x = 1.0
     # 默认的相似度阈值
-    residual_sim_threshold = 0.90
+    residual_sim_threshold = 0.95
 
     if mode == "standard_dip":
         learning_rate = 1e-3
@@ -52,26 +52,27 @@ def build_trainer_config(args: argparse.Namespace, mode: str) -> TrainerConfig:
         reg_noise_std = 0.03
     elif mode == "as_dip":
         learning_rate = 0.1
-        latent_learning_rate = 0.1
-        # 【关键】：降低 TV 到 0.1，把舞台留给解冻后的 CNN
-        tv_weight = 0.1
-        reg_noise_std = 0.03
+        latent_learning_rate = 0.01
+
+        # 使用 getattr 安全获取，如果 loader.py 没注册这个参数，就默认用后面的数值
+        tv_weight = getattr(args, "tv_weight", 0.15)
+        reg_noise_std = getattr(args, "reg_noise_std", 0.015)
 
         use_asdip_enhancement = True
-        exp_smoothing = 0.90
+        exp_smoothing = 0.95
         phase1_fraction = 0.15
         phase2_fraction = 0.15
-        tv_weight_t = 1.2
-        tv_weight_x = 0.8
-        # 【解除封印】：防止过早触发 Signal Leakage 锁死学习率！
-        residual_sim_threshold = 0.995
+
+        tv_weight_t = getattr(args, "tv_weight_t", 0.1)
+        tv_weight_x = getattr(args, "tv_weight_x", 1.5)
+        residual_sim_threshold = getattr(args, "residual_similarity_threshold", 0.95)
     else:
         learning_rate = args.learning_rate
         latent_learning_rate = args.latent_learning_rate
         tv_weight = args.tv_weight
         reg_noise_std = 0.0
 
-    current_iterations = args.iterations if mode == "standard_dip" else args.iterations * 2
+    current_iterations = args.iterations if mode == "standard_dip" else int(args.iterations * 1.5)
 
     return TrainerConfig(
         mode=mode,
@@ -97,7 +98,7 @@ def build_trainer_config(args: argparse.Namespace, mode: str) -> TrainerConfig:
         use_structured_latent=use_asdip_enhancement,
         latent_coord_channels=2,
         mse_weight=1.0,
-        l1_weight=0.0,
+        l1_weight=0.1,
         gradient_weight=0.0,
         phase3_latent_lr_scale=0.5 if use_asdip_enhancement else 0.1,
 

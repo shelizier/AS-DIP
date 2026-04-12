@@ -43,7 +43,7 @@ class TrainerConfig:
     tv_mode: str = "l1"
     log_interval: int = 100
     exp_smoothing: float = 0.99
-    reg_noise_std: float = 0.0
+    reg_noise_std: float = 0.015
     train_norm_layers: bool = True
     train_output_adapter: bool = True
     unet_features: tuple[int, ...] = (64, 128, 256, 512)
@@ -52,23 +52,26 @@ class TrainerConfig:
     phased_optimization: bool = False
     phase1_fraction: float = 0.2
     phase2_fraction: float = 0.3
-    phase3_latent_lr_scale: float = 0.1
+    phase3_latent_lr_scale: float = 0.2
     backbone_learning_rate: float = 5e-4
     residual_similarity_window: int = 9
-    residual_similarity_threshold: float = 0.9
+    residual_similarity_threshold: float = 0.95
     residual_backbone_lr_scale: float = 0.5
-    use_structured_latent: bool = False
+    use_structured_latent: bool = True
     latent_coord_channels: int = 2
     mse_weight: float = 1.0
-    l1_weight: float = 0.0
-    tv_weight_t: float = 1.0
-    tv_weight_x: float = 1.0
+    l1_weight: float = 0.1
+    tv_weight_t: float = 0.1
+    tv_weight_x: float = 1.5
     gradient_weight: float = 0.0
     reg_noise_std_phase1: Optional[float] = None
     reg_noise_std_phase2: Optional[float] = None
     reg_noise_std_phase3: Optional[float] = None
     lr_decay_end_factor: float = 0.25
-
+    ssim_weight: float = 0.2
+    ortho_weight: float = 0.25
+    ortho_window: int = 9
+    max_allowed_snr: float = 13
 
 @dataclass
 class ExperimentArtifacts:
@@ -97,6 +100,9 @@ class ASDIPTrainer:
             tv_weight_t=config.tv_weight_t,
             tv_weight_x=config.tv_weight_x,
             gradient_weight=config.gradient_weight,
+            ssim_weight=config.ssim_weight,
+            ortho_weight=config.ortho_weight,
+            ortho_window=config.ortho_window
         )
 
     def _build_backbone(self) -> nn.Module:
@@ -512,15 +518,22 @@ class ASDIPTrainer:
             metrics = compute_metrics(output_np=smooth_np, noisy_np=noisy, clean_np=clean)
             tracker.update(iteration=iteration, elapsed_seconds=elapsed, loss_terms=loss_terms, metrics=metrics)
 
-            TARGET_SNR = 15.0
             model_score = metrics.get("snr", -loss_terms["total"])
+            import math
+            has_snr = "snr" in metrics and not math.isnan(metrics["snr"])
 
-            if best_score < TARGET_SNR:
-                if model_score > best_score:
-                    best_score = model_score
-                    best_output = smooth_np.copy()
-                    tracker.best_iteration = iteration
-                    tracker.best_metrics = metrics.copy()
+            # 核心拦截逻辑：
+            # 1. 如果当前 SNR 突破了允许的安全上限，说明极大概率正在发生严重的信号泄露
+            # 我们拒绝更新 best_iteration，即使当前的得分在数值上更高
+            if has_snr and metrics["snr"] > self.config.max_allowed_snr:
+                pass
+
+                # 2. 在安全范围内，只要当前成绩优于历史最高分，就正常更新
+            elif model_score > best_score:
+                best_score = model_score
+                best_output = smooth_np.copy()
+                tracker.best_iteration = iteration
+                tracker.best_metrics = metrics.copy()
 
             if iteration % self.config.log_interval == 0 or iteration == 1 or iteration == self.config.iterations:
                 residual_similarity = None
